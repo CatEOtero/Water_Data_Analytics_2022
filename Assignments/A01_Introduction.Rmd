@@ -1,6 +1,6 @@
 ---
 title: "Assignment 1: Introduction"
-author: "Student Name"
+author: "Catherine Otero"
 output: pdf_document
 geometry: margin=2.54cm
 editor_options: 
@@ -26,19 +26,35 @@ Target due date: 2022-01-18
 
 1. Post the link to your forked GitHub repository below. Your repo should include one or more commits and an edited README file.  
 
->  Link:
+>  Link: https://github.com/CatEOtero/Water_Data_Analytics_2022.git
 
 ## Data Visualization Exercises
 
 2. Set up your work session. Check your working directory, load packages `tidyverse`,  `dataRetrieval`, and `zoo`. Set your ggplot theme as theme_classic (you may need to look up how to set your theme).
 
 ```{r, message = FALSE}
+library(tidyverse)
+library(dataRetrieval)
+library(zoo)
 
+theme_set(theme_classic())
 ```
 
 3. Upload discharge data for the Eno River at site 02096500 for the same dates as we studied in class (2012-01-01 through 2021-12-31). Obtain data for discharge. Rename the columns with informative titles, as we did in class. 
 
 ```{r}
+EnoDischarge <- readNWISdv(siteNumbers = "02096500",
+                     parameterCd = "00060", # discharge (ft3/s)
+                     startDate = "2012-01-01",
+                     endDate = "2021-12-31")
+
+#rename the 4th and 5th data columns
+names(EnoDischarge)[4:5] <- c("Discharge_cfs", "Approval.Code")
+
+#View attribute info from data retrieval 
+attr(EnoDischarge, "variableInfo")
+  # note: imperial, not metric
+attr(EnoDischarge, "siteInfo")
 
 ```
 
@@ -53,20 +69,52 @@ Target due date: 2022-01-18
 * Change the y axis from a linear to a log10 axis (hint: google "ggplot logged axis")
 * Add a legend. (hint: Google "add legend two geom layers ggplot")
 
-```{r}  
+```{r echo = T, results = 'hide'}  
+#create function to convert cubic feet per second to cubic meters per second
+CFS_TO_CMS <- function(x){
+  CMS_converted <- x*0.02832
+  return(CMS_converted)
+}
 
+#check if function is working
+CMS <- CFS_TO_CMS(3)
 
+CMS
+
+#mutate to create column with discharge in meters cubed per second. Also mutate with rollmean function to get a 30-day rolling mean of the metric discharge
+
+EnoDischarge_CMS <- EnoDischarge %>%
+  mutate(Discharge_cms=CFS_TO_CMS(Discharge_cfs)) %>% 
+  mutate(Discharge_mean=rollmean(Discharge_cms, 30, align = 'right', fill=NA))
+  
+EnoDischarge_CMS
+
+```
+
+```{r}
+
+#Plot the Discharge data
+EnoPlot2 <- ggplot(EnoDischarge_CMS, aes(x = Date)) +
+  geom_line(aes(y = Discharge_cms, color = "Daily")) +
+  geom_line(aes(y = Discharge_mean, color = "30 Day Rolling Mean")) +
+  labs(title = "Eno River Discharge from 2012-2021", x = "Year", 
+       y = "Discharge (m^3/s)") +
+  scale_color_discrete(name = "Discharge Interval") +
+  scale_y_continuous(trans = "log10")
+
+EnoPlot2
+  
 ```
 
 5. In what ways was the second plot a more effective visualization than the first? 
 
-> ANSWER: 
+> The second plot offered more detail and better labels, so a person knows what they are looking at without additional text blocks accompanying the plot. Showing the daily and 30 day average on one plot allows a person to compare the two also. With the increased detail of the second plot it's important to have clear labels to convey meaning and not just have a pretty uninterpretable graph.
 
 6. What portions of the coding were challenging for you?
 
-> ANSWER: 
+> ANSWER: The most challenging part of the code was figuring out how to add my own function into the mutate and then making sure all the plot parts came together.
 
 7. Interpret the graph you made. What are the things you notice about within- and across-year variability, as well as the differences between daily values and 30-day rolling mean?
 
-> ANSWER: 
+> ANSWER: Over the entire timeframe it appears that peak disharges have slightly increased. Within years, there is a lot of variability. The end of the year seems to have lower discharges. The 30-day rolling mean shows peak discharges follwing the daily peaks showing the trend for high disharges to add up over time.
 
