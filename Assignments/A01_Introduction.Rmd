@@ -81,7 +81,8 @@ CMS <- CFS_TO_CMS(3)
 
 CMS
 
-#mutate to create column with discharge in meters cubed per second. Also mutate with rollmean function to get a 30-day rolling mean of the metric discharge
+#mutate to create column with discharge in meters cubed per second. 
+#Also mutate with rollmean function to get a 30-day rolling mean of the metric discharge
 
 EnoDischarge_CMS <- EnoDischarge %>%
   mutate(Discharge_cms=CFS_TO_CMS(Discharge_cfs)) %>% 
