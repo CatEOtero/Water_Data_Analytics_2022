@@ -16,14 +16,16 @@ editor_options:
 ## Opening Discussion
 
 What are the physical properties of lakes?
+Light transmission, temperature, dissolved oxygen
 
 ## Session Set Up
 ```{r, message = FALSE}
 # Check working directory (should be project file location)
 getwd()
 
+#you cannot knit a markdown file if there is an active install line of code
 # install.packages("tidyverse")
-# install.packages("lubridate")
+# install.packages("lubridate") helps work with date and time
 # install.packages("rLakeAnalyzer")
 
 # load packages
@@ -31,7 +33,10 @@ library(tidyverse)
 library(lubridate)
 library(rLakeAnalyzer)
 
-# Load data
+# Load data; North Temperate Lakes Research Data from Wisconsin
+#read_csv is slightly different than read.csv, basically just faster, so use if bigger files.
+#relative file paths just start from where your working directory ends
+#here package also works with relative pathways
 NTLdata <- read.csv("./Data/Raw/NTL-LTER_Lake_ChemistryPhysics_Raw.csv")
 
 # set ggplot theme
@@ -50,26 +55,41 @@ Common steps/checks for data wrangling:
 
 ```{r}
 # Is the date column perceived as a date by R?
+#R needs to be explicitly told to recognize data as a date
+
+#class tells us what R is recognizing data as
 class(NTLdata$sampledate)
+#telling R we want it recognized as date. Make sure you use the same way that the date is written in the data i.e. date, month, two-digit year
+#two digit year is lowercase y and four digit is uppercase Y
 NTLdata$sampledate <- as.Date(NTLdata$sampledate, format = "%m/%d/%y")
 class(NTLdata$sampledate)
 # What does this column look like now?
+#Now our column has been readjusted to internationally recognized format of year-month-day. It does this change itself and you do the same format as original data
 
 # Remove rows that contain NAs in temperature column
+#checks the dimension of the object; we're doing this to later see how many rows we dropped. row is first number then columns
+#Pipes %>% for nesting functions
 dim(NTLdata)
 NTLdata <- NTLdata %>%
   drop_na(temperature_C)
 dim(NTLdata)  
 
-# How many observations are there for each lake?
+# How many observations are there for each lake? Time in lecture 7:45pm
 summary(NTLdata$lakename)
+#shows how many rows each lake name appears in the data and since we removed the NA it also shows the number of temperature measurements we have
+#Peter and Paul have the most measurements and are the most famous of the lakes. One is fertilized and one is a control
 summary(as.factor(NTLdata$lakename))
 
 # Let's choose the two lakes with the most data
+#filter takes the rows we specify and includes it in new object
+#c indicates you are concatenating a list
+#the %in% is not a pipe; it represents "include" and satisfies the filter function
+#a normal pipe %>% is always outside of parentheses
 NTLdata_PeterPaul <- NTLdata %>%
   filter(lakename %in% c("Paul Lake", "Peter Lake"))
 
 # What is another way to use the filter command to get to the same result?
+#The vertical line represents the word OR
 NTLdata_PeterPaul <- NTLdata %>%
   filter(lakename == "Paul Lake" | lakename == "Peter Lake")
 
@@ -80,17 +100,20 @@ Peterdata <- NTLdata %>%
   filter(lakename == "Peter Lake")
 
 # How long did the monitoring last?
+#looking for mins and maxs; 1984-2016
 min(Pauldata$sampledate)
 max(Pauldata$sampledate)
 min(Peterdata$sampledate)
 max(Peterdata$sampledate)
 
 # Which depths are sampled in each lake?
+#brings up a list of the unique values; integers listed first then the 0.5s after
 unique(Pauldata$depth)
 unique(Peterdata$depth)
 # Why didn't we use the "summary" function here?
+#it doesn't give us the actual depths and increments just a range
 
-# QA the one data point at 20 m depth. 
+# QA the one data point at 20 m depth. We just do this b/c messes up visualization. Usually have to be very careful removing data!!!
 Pauldata <- Pauldata %>%
   filter(depth < 20)
 
@@ -101,11 +124,24 @@ Pauldata <- Pauldata %>%
 Let's make a plot of temperatures by depth. There are a lot of points, so adding a 50 % transparency to the points helps us see where points are densely clustered together.
 
 Let's also try using the traditional limnological graph type, with depth on the y axis in reverse, to simulate a cross section of a lake. When and where do we usually observe high and low temperatures?
+ggplot uses the + instead of %>% 
+alpha stands for transparency so this graph is at 50% transparency
+geom_point is the function for a scatterplot
 ```{r}
 ggplot(Pauldata, aes(x = depth, y = temperature_C)) + 
   geom_point(alpha = 0.5) +
   labs(y = expression("Temperature "(degree*C)), x = "Depth (m)")
+#temp more variable at surface, temp decreases with depth, seems to get
+#IV on x and DV on y classically but flip it to do sort of cross section of lake it's a tradition in limonology to do this. B/c it looks like a lake! Very cool
 
+#The one set of points is the one time of year (nov) when they sampled the lake
+#DOY is date of year in the legend
+#Thermally mixed is when the lake is same temp at all depths, homogeneous, little resistance to mixing b/c temp all the same; even a little wind can drive the mixing of a homogenous-temp lake. mixing here is moving the water around
+#stratified: in summer when temp differs across depths
+#epilimnion: top of lake
+#hypolimnion: bottom of lake; lots of ressitnace to mixing b/c of the differences in the denisity of water when temps are different. less dense in warmer water.
+#Dimictic: Di-two mictic mixing So a dimictic lake mixes twice a year
+#Water is densest at 4 degrees celsius and stabalizes there
 ggplot(Pauldata, aes(x = temperature_C, y = depth, color = daynum)) +
   geom_point(alpha = 0.5) +
   scale_y_reverse() +
