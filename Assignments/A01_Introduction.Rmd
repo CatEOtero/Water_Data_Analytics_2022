@@ -6,6 +6,11 @@ geometry: margin=2.54cm
 editor_options: 
   chunk_output_type: console
 ---
+##General Help
+Changes don't show up to be committed until you save it in R
+Open your Project File Folder to start a project. This makes sure Gut connectivity is working and that the directory/pathway is drawn
+###To make sure I pull at beginning of each session
+git remote add upstream https://github.com/KateriSalk/Water_Data_Analytics_2022.git
 
 ## OVERVIEW
 
@@ -94,7 +99,7 @@ EnoDischarge_CMS
 
 ```{r}
 
-#Plot the Discharge data
+#Plot the Discharge data; ask about the differences btw my code and hers
 EnoPlot2 <- ggplot(EnoDischarge_CMS, aes(x = Date)) +
   geom_line(aes(y = Discharge_cms, color = "Daily")) +
   geom_line(aes(y = Discharge_mean, color = "30 Day Rolling Mean")) +
