@@ -11,6 +11,7 @@ Changes don't show up to be committed until you save it in R
 Open your Project File Folder to start a project. This makes sure Gut connectivity is working and that the directory/pathway is drawn
 ###To make sure I pull at beginning of each session
 git remote add upstream https://github.com/KateriSalk/Water_Data_Analytics_2022.git
+Next time just have to do this code below
 git pull upstream main
 If branches are divergent: 
 
