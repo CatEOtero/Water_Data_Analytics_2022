@@ -121,12 +121,22 @@ Pauldata <- Pauldata %>%
 
 ### Exploratory data visualization
 
+Can click the outline button and it will take you to where you left off. Can click the gray triangle with green rectangle under it to run all the code above.
+
 Let's make a plot of temperatures by depth. There are a lot of points, so adding a 50 % transparency to the points helps us see where points are densely clustered together.
 
 Let's also try using the traditional limnological graph type, with depth on the y axis in reverse, to simulate a cross section of a lake. When and where do we usually observe high and low temperatures?
 ggplot uses the + instead of %>% 
 alpha stands for transparency so this graph is at 50% transparency
 geom_point is the function for a scatterplot
+
+Dimictic = mixes twice a year, winter and summer
+
+Monomictic = mixes once, more likely to mix when the air temp is warmer than the water. 
+
+Polymictic = not strong seasonal mixing. Mixes often throughout the year with wind and storms etc. Shallow lakes tend to be polymictic b/c less thermal mass overall. Not a strong thermal profile b/c not lots of time to build this up
+
+Amictic = always stratified, usually deep and/or very sheltered so wind doesn't get it
 ```{r}
 ggplot(Pauldata, aes(x = depth, y = temperature_C)) + 
   geom_point(alpha = 0.5) +
@@ -169,12 +179,20 @@ ggplot(subset(Pauldata, year4 == 1993),
   geom_point(alpha = 0.5) +
   scale_y_reverse() +
   scale_color_viridis_c() +
-  labs(x = expression("Temperature "(degree*C)), y = "Depth (m)", color = "DOY") 
+  labs(x = expression("Temperature"(degree*C)), y = "Depth (m)", color = "DOY")
 
-# Now, make a plot as above but with dissolved oxygen saturation instead of temperature.
 
+# Now, make a plot as above but with dissolved oxygen saturation instead of temperature. Epithelium (the shallower, has more dissolved oxygen b/c wave motion can incorporate O2 into the water, also photosynthesizing, algae)
+ggplot(subset(Pauldata, year4 == 1993), 
+       aes(x = dissolvedOxygen, y = depth, color = daynum)) +
+  geom_point(alpha = 0.5) +
+  scale_y_reverse() +
+  scale_color_viridis_c() +
+  labs(x = expression("DissolvedOxygen"), y = "Depth (m)", color = "DOY")
+#phyotplankton hang out in Deep chlorocal maximum (usually the thermocline=the division btw epi and hypno) b/c where they max sunlight and also where get nutrients diffusing upwards from the hypnoliumnium are maxed. More CO2 and methane in hypnoliumnium
 
 ```
+lots of rift valleys are amictic b/c so deep and climate doesn't facilitate mixing
 
 Why does mixing occur in the spring and fall? What are the mechanisms that make this possible?
 <add notes here>
@@ -191,10 +209,13 @@ Pauldata_thermo <- Pauldata %>%
   # calculate thermoclines based on temperature profiles. 
   # seasonal = FALSE calculates the thermocline as the maximum density gradient
   # seasonal = TRUE calculates the thermocline as the deepest density gradient
+  #you can specify the gradient, default is 1 degree per 1 meter
+  #by default it removes the NAs
   summarise(thermocline = thermo.depth(wtr = temperature_C, depths = depth, seasonal = FALSE)) %>%
-  # remove all thermoclines within 1 m of the surface. these can represent transient stratification.
+  # remove all thermoclines within 1 m of the surface. these can represent transient stratification aka surface-level stratification resulting from some sunshine warming that goes away quickly.
   filter(thermocline > 1)
 
+#thermocline deepens as year goes on. variability in the beginning of year then increased consistency. Monomictic or dimicitic lakes we often say things like day since first stratification.
 ggplot(Pauldata_thermo, aes(x = daynum, y = thermocline)) +
   geom_point() 
   
@@ -210,9 +231,11 @@ Increases in global temperature are predicted to cause several changes to lake t
 
 * Increases in surface temperature
 * Increases in surface minimum temperature
-* Increases in extent of stratification
-* Increases in length of stratification
+* Increases in extent of stratification 
+* Increases in length of stratification, day of first stratification may happen earlier and last day of stratification may be later
 * Decreases in ice cover
+
+This are expected to happen incrementally, so have to search through the noise and having long-term data will be helpful.
 
 Several studies have addressed this topic, using long-term and spatially diverse datasets: 
 
@@ -226,10 +249,12 @@ https://link.springer.com/article/10.1007/s10584-019-02465-y
 
 Let's explore how these changes might manifest in Paul Lake. 
 ```{r}
+#tricky to see the trends, if they exist
 ggplot(Pauldata_thermo, aes(x = daynum, y = thermocline, color = year4)) +
   geom_point() +
   scale_color_viridis_c()
 # exercise: put the legend on top and relabel the aesthetics
+
 
 ggplot(subset(Pauldata, depth == 1),
        aes(x = daynum, y = temperature_C, color = as.factor(year4))) +
