@@ -26,7 +26,7 @@ getwd()
 library(tidyverse)
 library(dataRetrieval)
 library(lubridate)
-library(lfstat)
+library(lfstat) #low flow statisitcs
 
 
 theme_set(theme_classic())
@@ -36,21 +36,23 @@ theme_set(theme_classic())
 
 A **recurrence interval** is the past recurrence of an event, in this case a peak annual discharge measurement of a given magnitude. The value of a recurrence interval corresponds to the average number of years between discharge of a given magnitude. Typically the minimum amount of years required to construct a recurrence interval is 10, but 30 is more robust. A recurrence interval, T, is calculated as: 
 
+The dollar signs around an equation, make it appear as an equation when the doc is knitted. Hover over the code here to see how it will knit.
 $T = (n+1)/m$
 
 where n is the number of years and m is the ranking of an event within the observed period. We add one to n because we are computing the recurrence interval for a discharge event of a given magnitude *or greater*. 
 
-Similarly, we can calculate an **exceedence probability**, or the probability of encountering a discharge event of a given magnitude or greater in any given year: 
+Similarly, we can calculate an **exceedance probability**, or the probability of encountering a discharge event of a given magnitude or greater in any given year: 
 
 $P = 1/T$
 
-This is where the terms "100-year flood" and similar are derived. Remember this is a probability based on past occurrence, not an accurate forecast of how often we will see that event happening. When current patterns of discharge differ from past patterns, we observe **nonstationary** behavior. Nonstationarity results in events that occur more or less frequency than predicted based on the exceedence probability.
+This is where the terms "100-year flood" and similar are derived. Remember this is a probability based on past occurrence, not an accurate forecast of how often we will see that event happening. When current patterns of discharge differ from past patterns, we observe **non-stationary** behavior. Non-stationary results in events that occur more or less frequency than predicted based on the exceedance probability. Stationary means does the behavior of the river change over time? The trend of the river overtime is the same. Can have ups and downs throughout year but not up and down overtime
 
 ### Has Eno River dicharge displayed stationary behavior over the period of record?
 
 Let's import discharge data for the Eno River near Durham for all available dates.
 
 ```{r}
+#End of September is the end of a water year b/c captures end of snow pack and beginning of snow pack in start of year. USGS does this to not split the snowpack.
 EnoDischarge <- readNWISdv(siteNumbers = "02085070",
                      parameterCd = "00060", # discharge (ft3/s)
                      startDate = "", 
@@ -58,6 +60,7 @@ EnoDischarge <- readNWISdv(siteNumbers = "02085070",
 
 names(EnoDischarge)[4:5] <- c("Discharge", "Approval.Code")
 
+#gives info from the column
 attr(EnoDischarge, "variableInfo")
 attr(EnoDischarge, "siteInfo")
   
@@ -69,15 +72,24 @@ ggplot(EnoDischarge, aes(x = Date, y = Discharge)) +
 
 We can then compute recurrence intervals based on the first 30 years of data.
 
+First do manually by data wrangling
+in lfstat you have the water_year function to acocunt for other places in the world having different water years
+Filter for water year not 1963 b/c 1963 only has a few observations in it
 ```{r}  
 EnoDischarge <- EnoDischarge %>%
   mutate(Year = year(Date), 
          WaterYear = water_year(Date, origin = "usgs")) %>%
   filter(WaterYear != "1963")
 
-# Water Year is a factor. We want to re-classify as numeric.
+# Water Year is a factor. We want to re-classify as numeric. Have to tell R that a factor is a character first and then can make it a numeric from there. If you don't do this it would start by renumbering the years as 1, 2, 3, etc
 EnoDischarge$WaterYear <- as.numeric(as.character(EnoDischarge$WaterYear))
 
+#filter for less than 1994 b/c want to do first 30 years of the data
+#groupby then summarise does what a pivot table does in excel
+#groupby says we want a value for every wateryear. If didn't do this and ran summarise w/o it then summarise would only give one value for all the years together. 
+#filter,groupby, and summarise all are intermediates and don't show up in the dataset that is generated. only the mutate is added as a column. if want them added have to do other steps
+#summarise is creating a 
+#the negative included in rank is telling R to rank the highest value first instead of smallest value as 1
 EnoRecurrence <- 
   EnoDischarge %>%
   filter(WaterYear < 1994) %>%
@@ -86,6 +98,8 @@ EnoRecurrence <-
   mutate(Rank = rank(-PeakDischarge), 
          RecurrenceInterval = (length(WaterYear) + 1)/Rank, 
          Probability = 1/RecurrenceInterval)
+#probability that amount of precip or more occurring
+
 
 ggplot(EnoRecurrence, aes(x = WaterYear, y = PeakDischarge)) +
   geom_bar(stat = "identity") +
@@ -93,17 +107,24 @@ ggplot(EnoRecurrence, aes(x = WaterYear, y = PeakDischarge)) +
 
 ```
 
-Let's display and model the relationship between peak annual disharge and recurrence interval. We can use the statistical model to compute discharge for recurrence intervals that occur above the 30-year mark.
+Let's display and model the relationship between peak annual discharge and recurrence interval. We can use the statistical model to compute discharge for recurrence intervals that occur above the 30-year mark.
 ```{r}
+#stinkin log10 haha. Log10 makes it look more linear
 ggplot(EnoRecurrence, aes(x = RecurrenceInterval, y = PeakDischarge)) +
   geom_point() +
   scale_x_log10() +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") #, color = "black", se = FALSE)
+#change the line color to black and take away the standard error glow
 
+#tells us the equation of the line for the above graph
+#91% of variability is accounted for by the model
+#can calculate recurrence intervals with as little as 10 years of data but fewer years less accurate
 Eno.RImodel <- lm(data = EnoRecurrence, PeakDischarge ~ log10(RecurrenceInterval))
 summary(Eno.RImodel)
 
 #What is the discharge for a 100-year flood in this system? a 500-year flood?
+#take the intercept (1) and the slope (2) and plug into the equation along with the number of years you're thinking about
+#this is telling us, we have the EnoRImodel data and we want to take the coefficient column and the first value in that column and then the second hence the 1 and 2s then log10 for our years. think of the equation from above! See line 122 for the log10(recurrenceinterval)
 Eno.RImodel$coefficients[1] + Eno.RImodel$coefficients[2]*log10(100)
 Eno.RImodel$coefficients[1] + Eno.RImodel$coefficients[2]*log10(500)
 ```
@@ -119,12 +140,14 @@ EnoRecurrence.Late <-
          RecurrenceInterval = (length(WaterYear) + 1)/Rank, 
          Probability = 1/RecurrenceInterval)
 
+#As remarkable events (higher recurrence intervals) the larger the discharge for later years than earlier
 ggplot(EnoRecurrence, aes(x = RecurrenceInterval, y = PeakDischarge)) +
   geom_point() +
   geom_point(data = EnoRecurrence.Late, color = "#02818a",
              aes(x = RecurrenceInterval, y = PeakDischarge)) +
   scale_x_log10()
 
+#compare our late and early model slopes. big increase in slope for later years
 Eno.RImodel.Late <- lm(data = EnoRecurrence.Late, PeakDischarge ~ log10(RecurrenceInterval))
 summary(Eno.RImodel.Late)
 Eno.RImodel.Late$coefficients
@@ -133,6 +156,8 @@ Eno.RImodel$coefficients
 Eno.RImodel.Late$coefficients[1] + Eno.RImodel.Late$coefficients[2]*log10(100)
 Eno.RImodel.Late$coefficients[1] + Eno.RImodel.Late$coefficients[2]*log10(500)
 
+#can see that the slope is increasing with these results also
+#they substansiate. new 100 yr flood is bigger than old 500 yr flood
 Eno.RImodel$coefficients[1] + Eno.RImodel$coefficients[2]*log10(100)
 Eno.RImodel$coefficients[1] + Eno.RImodel$coefficients[2]*log10(500)
 
@@ -140,14 +165,16 @@ Eno.RImodel$coefficients[1] + Eno.RImodel$coefficients[2]*log10(500)
 
 What differences did you see for the recurrence intervals built under different periods of record? How would your prediction of flood events differ if you were to use these models for forecasting purposes? 
 
->
+>The Eno is not displaying stationary behavior. Important to update recurrence intervals as we have more data/ with newer years and also think about impacts of climate change
 
 What would you recommend for a watershed manager seeking to build the most accurate recurrence interval model for the Eno River?
 
-> 
+> Use the newer record please.
 
 
 ### Examining the effects of urbanization on discharge
+
+Examples of non-stationary behavior due to human impact
 
 Salado Creek is located in San Antonio, Texas, an area that has been rapidly urbanizing over the course of the last several decades (http://worldpopulationreview.com/us-cities/san-antonio-population/#byPopulation). Is this system exhibiting stationarity?
 
@@ -163,7 +190,10 @@ ggplot(SaladoDischarge, aes(x = Date, y = Discharge)) +
   geom_line() +
   labs(x = "Year", y = "Discharge (cfs)")
 
+#make sure you are calling the correct columns either with names or matrix calls i.e. in da []
 
+#highly urbanized/channelized areas have higher, shorter peaks
+#classic example here with higher peaks overtime
 ```
 
 ### Examining the effects of dam construction on recurrence intervals
@@ -181,6 +211,7 @@ ggplot(GreenDischarge, aes(x = Date, y = Discharge)) +
   geom_line() +
   labs(x = "Year", y = "Discharge (cfs)")
 
+#downstream from Howard Hanson dam. built in 1961. can see the immediate drop in the peak. built for flood control for Tacoma, Washington
 ```
 
 ## Bonus content: Flow Duration Curves and Low Flow Statistics

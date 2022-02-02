@@ -98,11 +98,7 @@ scale_color_viridis_d()
 
 NTLdata_thermo <- NTLdata %>%
 group_by(lakename, daynum, Month, year4, sampledate) %>%
-# calculate thermoclines based on temperature profiles.
-# seasonal = FALSE calculates the thermocline as the maximum density gradient
-# seasonal = TRUE calculates the thermocline as the deepest density gradient
 summarise(thermocline = thermo.depth(wtr = temperature_C, depths = depth, seasonal = FALSE)) %>%
-# remove all thermoclines within 1 m of the surface. these can represent transient stratification.
 filter(thermocline > 1)
 ```
 

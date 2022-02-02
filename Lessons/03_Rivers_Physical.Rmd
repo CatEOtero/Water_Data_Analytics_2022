@@ -166,6 +166,7 @@ EnoPlot <-
         axis.text.x = element_blank(), axis.title.x = element_blank())
 EnoPlot
 
+#arizona
 VerdePlot <- 
   ggplot(CombinedDischarge, aes(x = Date, y = Verde.Discharge)) +
   geom_line() +
@@ -181,9 +182,10 @@ BitterrootPlot <-
   theme(plot.title = element_text(margin = margin(b = -10), size = 12), 
         axis.text.x = element_blank(), axis.title.x = element_blank())
 
-
+#mountain west
 BitterrootPlot
 
+#Minnesota
 SaukPlot <- 
   ggplot(CombinedDischarge, aes(x = Date, y = Sauk.Discharge)) +
   geom_line() +
@@ -192,6 +194,7 @@ SaukPlot <-
         axis.text.x = element_blank(), axis.title.x = element_blank())         
 SaukPlot
 
+#oregon
 NehalemPlot <- 
   ggplot(CombinedDischarge, aes(x = Date, y = Nehalem.Discharge)) +
   geom_line() +
@@ -239,22 +242,26 @@ BitterrootDischarge.Historical <- readNWISdv(siteNumbers = "12344000",
 
 names(BitterrootDischarge.Historical)[4:5] <- c("Discharge", "Approval.Code")
 
+#have to specify day of year to see across days
+#day of year is handy command from lubridate package
 BitterrootDischarge.Historical <- mutate(BitterrootDischarge.Historical, 
                                          DOY = yday(Date))
 
+#quantile you can say any percent btw 1-100%, remove all nas so don't mess with the analysis, remember to do this if have missing data you notice before or after running, may hav eempty gaps when check data table
 BitterrootDischarge.Pattern <- BitterrootDischarge.Historical %>%
   group_by(DOY) %>%
-  summarise(Median.Discharge = median(Discharge), 
+  summarise(Median.Discharge = median(Discharge, na.rm = TRUE), 
             p95.Discharge = quantile(Discharge, 0.95, na.rm = TRUE),
             p5.Discharge = quantile(Discharge, 0.05, na.rm = TRUE))
 
+#to have multiple Y's on one x-axis
 ggplot(BitterrootDischarge.Pattern, aes(x = DOY)) +
   geom_line(aes(y = Median.Discharge)) +
   geom_line(aes(y = p95.Discharge), color = "gray") +
   geom_line(aes(y = p5.Discharge), color = "gray") +  
   labs(x = "Day of Year", y = expression("Discharge (ft"^3*"/s)")) 
 ```
-
+Event-based precipitation/discharge
 
 ## Closing Discussion
 What are your impressions of seasonal and interannual discharge for our example rivers? How might you go about interpreting discharge data for any given river?
