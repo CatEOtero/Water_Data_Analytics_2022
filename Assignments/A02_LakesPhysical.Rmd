@@ -1,6 +1,6 @@
 ---
 title: "Assignment 2: Physical Properties of Lakes"
-author: "Student Name"
+author: "Catherine Otero"
 output: pdf_document
 geometry: margin=2.54cm
 editor_options: 
@@ -20,7 +20,7 @@ This exercise accompanies the lessons in Water Data Analytics on the physical pr
 
 Having trouble? See the assignment's answer key if you need a hint. Please try to complete the assignment without the key as much as possible - this is where the learning happens!
 
-Target due date: 2022-01-25
+Target due date: 2022-02-01
 
 ## Setup
 
@@ -31,8 +31,27 @@ Target due date: 2022-01-25
 5. Set your ggplot theme (can be theme_classic or something else)
 
 ```{r}
+getwd()
 
 
+library(tidyverse)
+library(lubridate)
+library(rLakeAnalyzer)
+
+#import data
+NTLdata <- read.csv("./Data/Raw/NTL-LTER_Lake_ChemistryPhysics_Raw.csv")
+
+#format sample date as column
+class(NTLdata$sampledate)
+NTLdata$sampledate <- as.Date(NTLdata$sampledate, format = "%m/%d/%y")
+class(NTLdata$sampledate)
+
+# set ggplot theme
+theme_set(theme_classic())
+
+NTLdata <- NTLdata %>%
+mutate(month = month(sampledate)) %>%
+drop_na(temperature_C)
 ```
 
 ## Creating and analyzing lake temperature profiles
@@ -42,7 +61,21 @@ Target due date: 2022-01-25
 What seasonal trends do you observe, and do these manifest differently in each lake?
 
 ```{r}
+ggplot(subset(NTLdata, year4 == 1993), 
+       aes(x = dissolvedOxygen, y = depth, color = daynum)) +
+  geom_point(alpha = 0.5) +
+  scale_y_reverse() +
+  scale_color_viridis_c() +
+  facet_wrap(vars(lakename))
+  labs(x = expression("DissolvedOxygen"), y = "Depth (m)", color = "DOY")
 
+ggplot(subset(NTLdata, year4 == 1993),
+aes(x = temperature_C, y = depth, color = daynum)) +
+geom_point(alpha = 0.5) +
+scale_y_reverse() +
+facet_wrap(vars(lakename)) +
+scale_color_viridis_c() +
+labs(x = expression("Temperature "(degree*C)), y = "Depth (m)", color = "DOY")
 
 ```
 
@@ -53,6 +86,23 @@ What seasonal trends do you observe, and do these manifest differently in each l
 Do all the lakes have a similar seasonal progression of thermocline deepening? Which lakes have the deepest thermoclines, and how does this relate to their maximum depth? 
 
 ```{r}
+NTLdata_thermo <- NTLdata %>%
+group_by(lakename, daynum, month, year4, sampledate) %>%
+summarise(thermocline = thermo.depth(wtr = temperature_C, depths = depth, seasonal = FALSE)) %>%
+filter(thermocline > 1) +
+geom_point(alpha = 0.5) +
+labs(x = "DOY", y = "Thermocline depth (m)", color = "Lake") +
+scale_color_viridis_d()
 
+
+
+NTLdata_thermo <- NTLdata %>%
+group_by(lakename, daynum, Month, year4, sampledate) %>%
+# calculate thermoclines based on temperature profiles.
+# seasonal = FALSE calculates the thermocline as the maximum density gradient
+# seasonal = TRUE calculates the thermocline as the deepest density gradient
+summarise(thermocline = thermo.depth(wtr = temperature_C, depths = depth, seasonal = FALSE)) %>%
+# remove all thermoclines within 1 m of the surface. these can represent transient stratification.
+filter(thermocline > 1)
 ```
 
