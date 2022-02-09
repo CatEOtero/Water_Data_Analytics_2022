@@ -73,7 +73,7 @@ ggplot(EnoDischarge, aes(x = Date, y = Discharge)) +
 We can then compute recurrence intervals based on the first 30 years of data.
 
 First do manually by data wrangling
-in lfstat you have the water_year function to acocunt for other places in the world having different water years
+in lfstat you have the water_year function to account for other places in the world having different water years
 Filter for water year not 1963 b/c 1963 only has a few observations in it
 ```{r}  
 EnoDischarge <- EnoDischarge %>%
