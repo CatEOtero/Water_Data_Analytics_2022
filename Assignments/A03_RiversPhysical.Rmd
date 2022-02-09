@@ -39,7 +39,7 @@ library(lfstat)
 theme_set(theme_classic())
 
 MysterySiteDischarge <- readNWISdv(siteNumbers = "03431700",
-                     parameterCd = "00060", # discharge (ft3/s)
+                     parameterCd = "00060", # discharge (ft3/s), check out the vignette on this
                      startDate = "1964-10-01", 
                      endDate = "2021-09-30")
 

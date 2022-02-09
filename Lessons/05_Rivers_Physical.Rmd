@@ -15,7 +15,9 @@ editor_options:
 
 ## Opening Discussion
 
-What might cause streams to have higher peak flow following a precipitation or snowmelt event? 
+What might cause streams to have higher peak flow following a precipitation or snowmelt event?
+
+network position aka how many tributaries etc. topography-larger more vertical basins. surface permeability. saturated soil. just more water. vegetation around it
 
 ## Session Set Up
 
@@ -24,8 +26,9 @@ getwd()
 
 # install.packages("EcoHydRology")
 
-library(EcoHydRology)
-library(tidyverse)
+library(EcoHydRology) #load EcoHydRology first so that these packages etc are dominant. If ever notice function is running oddly then check the order of how added in packages b/c some packages have functions do different things
+#can call the function via the package also like lubridate::mutate
+library(tidyverse) # load tidyverse after EcoHydRology so pipes aren't overrriden
 library(dataRetrieval)
 library(lubridate)
 library(lfstat)
@@ -54,11 +57,11 @@ ggplot(EnoDischarge, aes(x = Date, y = Discharge)) +
   labs(x = "Year", y = "Discharge (cfs)")
 ```
 
-Notice that the Eno River is very responsive to precipitation events, with frequent discharge peaks throughout the period of record. How much of the flow of the Eno River is attributed to stormflow pathways (also called quickflow) vs. baseflow?
+Notice that the Eno River is very responsive to precipitation events, with frequent discharge peaks throughout the period of record. Very precipitation respondent. How much of the flow of the Eno River is attributed to stormflow pathways (also called quickflow) vs. baseflow?
 
 ### Calculating baseflow and stormflow
 
-**Stormflow** is attributed to overland flow and shallow subsurface flow that deliver water quickly to a stream or river of interest. **Baseflow** is attributed to slower flow pathways, including but not limited to groundwater.
+**Stormflow** is attributed to overland flow and shallow subsurface flow that deliver water quickly to a stream or river of interest. **Baseflow** is attributed to slower flow pathways, including but not limited to groundwater. Some portion of snowmelt may be considered baseflow.
 
 The `lfstat` package includes a calculation for baseflow (function: `baseflow`). The `EcoHydRology` package also includes a `BaseflowSeparation` function. Both of these packages have optional specifications that can be tinkered with by the user based on the specific context of the stream of interest. See the help files for these functions for more info.
 
@@ -69,27 +72,45 @@ EnoDischarge <- EnoDischarge %>%
          Stormflow_lfstat = Discharge - Baseflow_lfstat,
          Year = year(Date), 
          WaterYear = water_year(Date))
+#interpolation done by the lfstat package so 12 at front and 12 at end are used for R to calibrate the calculations. Can likely mess around with this but for this dataset with it being so big and just for practice it's okay to use 24 rows
+
+#remember to change to a numeric must change to character first
 EnoDischarge$WaterYear <- as.numeric(as.character(EnoDischarge$WaterYear))
 
+
 # plot baseflow and total flow
+
 ggplot(EnoDischarge, aes(x = Date, y = Discharge)) +
   geom_line(color = "gray") +
-  geom_line(aes(y = Baseflow_lfstat)) +
-  # scale_y_log10() +
+  geom_line(aes(y = Baseflow_lfstat)) + #specify new y aesthetic so have to recall the y aesthetic. could even specify another data frame in here by doing geomline_line(data = thenewdataset, aes(y = Baseflow_lfstat))
+  #also if saem coulmn names in both datasets then don't have to add in the aes. The aes is where define x, y, etc. The first line in ggplot is where set the main dataset and main aes.
+  scale_y_log10() +
   labs(x = "Year", y = "Discharge (cfs)")
+#Eno is perennial river so always some base flow but peaks and valleys. rarely get over 100 for base flow and regularly close to 1000 for storm flow
+#log10 helps to compare the differences btw things b/c easier to compare the difference btw 10 and 1000 then random numbers whereas w/o log10 (comment it out) you can see overall magnitude of storm flow
 
 # calculate baseflow with the EcoHydRology package.
 # Note: this function creates two columns which can be joined onto the original dataset.
+#bt=baseflow qft=quickflow
 EnoDischarge_basesep_EcoHydro <- BaseflowSeparation(EnoDischarge$Discharge)
 
+#cbind = column bind
 EnoDischarge <- cbind(EnoDischarge, EnoDischarge_basesep_EcoHydro)
 
 # Let's compare the two approaches. How well do they match up, and is one biased a certain way?
+#remember alpha is for transparency. these alpha means 90% transparency
+# geom_abline is helping us compare the methods. if perfectly equivalent methods then all dots would be on the line
+#x is from one method of calculating baseflow and y is from the other baseflow. remember bt = baseflow
 ggplot(EnoDischarge, aes(x = Baseflow_lfstat, y = bt)) +
   geom_point(alpha = 0.1, size = 1) +
   geom_abline(slope = 1, intercept = 0, color = "darkred")
 
 # How would we test that statistically? [add code here]
+#a paired t-test could work but remember combine the means
+summary(lm(data = EnoDischarge, bt ~ Baseflow_lfstat))
+#yay! want the estimate to be close to 1 to be perfectly linear and it is. ideally intercept would be 0 but we are off but that's okay. 
+
+t.test(bt, Baseflow_lfstat)
 
 ```
 
@@ -104,11 +125,12 @@ EnoDischarge_18_20 <- EnoDischarge %>%
   filter(WaterYear %in% c(2018:2020))
 
 ggplot(EnoDischarge_18_20, aes(x = Date, y = Discharge)) +
-  geom_line(color = "gray") +
-  geom_line(aes(y = Baseflow_lfstat), color = "darkred") +
-  geom_line(aes(y = bt)) +
+  geom_line(color = "gray") + #this means that Dishcarge will be in gray
+  geom_line(aes(y = Baseflow_lfstat), color = "darkred") + #Baseflow_lfstat will be in darkred
+  geom_line(aes(y = bt)) + #bt will just be in default black
   scale_y_log10() +
   labs(x = "Year", y = "Discharge (cfs)")
+#2018 fall increased baseflow b/c of Hurricane Florence
 
 EnoDischarge_ex<- EnoDischarge %>%
   filter(Date > "2019-07-15" & Date < "2019-09-01")
@@ -129,18 +151,21 @@ Now, let's calculate some annual flow metrics for the Eno. We can add up daily d
 ```{r}
 EnoDischarge_summary <- EnoDischarge %>%
   group_by(WaterYear) %>%
-  summarise(Discharge.acft.yr = sum(Discharge)*723.968, # what is this factor?
+  summarise(Discharge.acft.yr = sum(Discharge)*723.968, # what is this factor? converting from ft3/sec to acreft/yr. weird thing where science uses imperial system here
+            #use group_by to pick what you then want the summary for
             Baseflow.acft.yr = sum(bt)*723.968,
             Stormflow.acft.yr = sum(qft)*723.968,
             Prop.bf = Baseflow.acft.yr/Discharge.acft.yr,
             Prop.sf = Stormflow.acft.yr/Discharge.acft.yr) %>%
- mutate_if(is.numeric, round, 2) # notes here
+ mutate_if(is.numeric, round, 2) # if a column is numeric then round the values to 2 decimal places
 
 
 ggplot(EnoDischarge_summary, aes(x = WaterYear, y = Discharge.acft.yr)) +
   geom_line() +
   geom_line(aes(y = Baseflow.acft.yr), lty = 2)
+#lty changes the line type i.e. solid vs dotted vs other
 
+#look at proportion overtime
 ggplot(EnoDischarge_summary, aes(x = WaterYear, y = Prop.bf)) +
   geom_col()
 
@@ -158,12 +183,52 @@ Split into two groups. Each group will acquire discharge data and perform a base
 
 After you've completed your task, find a partner who analyzed the other gage. Compare the patterns in discharge and baseflow between the two sites. Work together to make a diagnosis of what could be happening over time in the Arkansas River (hint: the Coolidge site is upstream of the Dodge City site). 
 
-[Add notes here from your discussion with your partner and our discussion as a class]
+Lost water to GW instead of gaining it b/c of heavy pumping in the area
 
 This exercise is based off a case study in Zimmer et al. 2020: (Zero or not? Causes and consequences of zero-flow stream gage  readings)[https://wires.onlinelibrary.wiley.com/doi/10.1002/wat2.1436]
 
 ```{r}
+DodgeCity_Discharge <- readNWISdv(siteNumbers = "07139500",
+                     parameterCd = "00060", # discharge (ft3/s)
+                     startDate = "1960-01-01", 
+                     endDate = "2005-12-31")
 
+names(DodgeCity_Discharge)[4:5] <- c("Discharge", "Approval.Code")
+
+ggplot(DodgeCity_Discharge, aes(x = Date, y = Discharge)) +
+  geom_line() +
+  labs(x = "Year", y = "Discharge (cfs)")
+
+DodgeCity_Discharge <- DodgeCity_Discharge %>%
+  mutate(Baseflow_lfstat = baseflow(Discharge), 
+         Stormflow_lfstat = Discharge - Baseflow_lfstat,
+         Year = year(Date), 
+         WaterYear = water_year(Date))
+
+#remember to change to a numeric must change to character first
+DodgeCity_Discharge$WaterYear <- as.numeric(as.character(DodgeCity_Discharge$WaterYear))
+
+ggplot(DodgeCity_Discharge, aes(x = Date, y = Discharge)) +
+  geom_line(color = "gray") +
+  geom_line(aes(y = Baseflow_lfstat)) + 
+  #scale_y_log10() +
+  labs(x = "Year", y = "Discharge (cfs)")
+
+DodgeCity_Discharge_basesep_EcoHydro <- BaseflowSeparation(DodgeCity_Discharge$Discharge)
+
+#cbind = column bind
+DodgeCity_Discharge <- cbind(DodgeCity_Discharge, DodgeCity_Discharge_basesep_EcoHydro)
+
+ggplot(DodgeCity_Discharge, aes(x = Baseflow_lfstat, y = bt)) +
+  geom_point(alpha = 0.1, size = 1) +
+  geom_abline(slope = 1, intercept = 0, color = "darkred")
+
+# How would we test that statistically? [add code here]
+#a paired t-test could work but remember combine the means
+summary(lm(data = DodgeCity_Discharge, bt ~ Baseflow_lfstat))
+
+ggplot(EnoDischarge_summary, aes(x = WaterYear, y = Prop.bf)) +
+  geom_col()
 
 ```
 
