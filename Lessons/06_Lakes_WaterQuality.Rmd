@@ -15,6 +15,7 @@ editor_options:
 
 ## Opening Discussion
 What are the major water quality impairments experienced in lakes?  
+nutrient, sediment, thermal (generally protecting fish from this), metals, cations, pesticides, herbicides, pathogens, bacteria, fungi, viruses
 
 ## Session Set Up
 
@@ -27,8 +28,11 @@ library(lubridate)
 library(LAGOSNE)
 
 theme_set(theme_classic())
-options(scipen = 100)
 
+#setting this number tells r how many digits to report out instead of doing 2e4 thingy
+options(scipen = 4)
+
+#a linked database, lots of data within the database, takes a long time like 5mins to download
 lagosne_get(dest_folder = LAGOSNE:::lagos_path(), overwrite = TRUE)
 
 ```
@@ -36,7 +40,7 @@ lagosne_get(dest_folder = LAGOSNE:::lagos_path(), overwrite = TRUE)
 ## Getting to know the LAGOSNE database
 Navigate to https://lagoslakes.org/. We will explore this website to learn about the LAGOS-NE dataset, research, and data management and use initiatives undergone by the resaerch team. 
 
-<add any pertinent notes here>
+LagosNE is the start of nationwide effort. Rolling out over next few months. Their github page has a vignette on downloading etc and another on the organization of the dataset
 
 Useful introductions to the LAGOSNE R Package can be found here: 
 
@@ -46,12 +50,14 @@ https://cont-limno.github.io/LAGOSNE/articles/lagosne_structure.html
 ```{r}
 # Load LAGOSNE data into R session
 LAGOSdata <- lagosne_load()
+#comes in as a list b/c it is a group of dataframes within a dataset
 names(LAGOSdata)
 
 # If the package installation and data download has not worked, use this code: 
 # load(file = "./Data/Raw/LAGOSdata.rda")
+# this is an r object that will work as a work around
 
-# Exploring the data types that are available
+# Exploring the data types that are available, LAGOSdata is our overarching list and pull out a smaller dataframe using following command
 LAGOSlocus <- LAGOSdata$locus
 LAGOSstate <- LAGOSdata$state
 LAGOSnutrient <- LAGOSdata$epi_nutr
@@ -67,9 +73,12 @@ LAGOSNE is stored in several pieces, comprising metadata about given lakes (one 
 
 For example, let's find out how many lakes are in each state. Note that LAGOSlocus only includes the state_zoneid, whereas  LAGOSstate connects state_zoneid for each state.
 
+The datasets is organized in a star schema so you are able to link all the dataframes in one way or another
 
 ```{r}
-# Join data frames
+# Join data frames, left_join means if there's a corresponding column in LAGOSstae that is in LAGOSlocus then it will join them. If the columns have the same name then don't need by function
+#if columns have same data but different names: by = c("colnameinfirstdf = "colnamein2nddf" and could go on and join more = "colnamein3rddf")
+#left-join is in dplyr package
 LAGOSlocations <- left_join(LAGOSlocus, LAGOSstate, by = "state_zoneid")
 
 ggplot(LAGOSlocations, aes(x = state)) + 
@@ -79,17 +88,19 @@ ggplot(LAGOSlocations, aes(x = state, y = lake_area_ha)) +
   geom_boxplot() +
   scale_y_log10()
 
+#to figure out how to reorder the x-axis - google this, maybe relevel or level, do at the df level not in ggplot
 ```
 
 ## Trophic state as a metric for water quality
-Robert Carlson's 1977 paper, "A trophic state index for lakes," established the first numeric categorization system for a lake's **trophic state**, the amount of biomass a given system can sustain. Trophic state is a useful water quality metric, as it can give insight into the propensity of a system to develop algal blooms, the degree of nutrient loading in the system, and a range of other potential water quality concerns experienced by other lakes with a similar trophic state (e.g., hypoxia).
+Robert Carlson's 1977 paper, "A trophic state index for lakes," established the first numeric categorization system for a lake's **trophic state**, the amount of biomass a given system can sustain. Trophic state is a useful water quality metric, as it can give insight into the propensity of a system to develop algal blooms, the degree of nutrient loading in the system, and a range of other potential water quality concerns experienced by other lakes with a similar trophic state (e.g., hypoxia). Stood the test of time in limnology
 
 To calculate the **Trophic State Index**, three variables can be used. Note these should not be used to define trophic state but as indicators of the broader condition. Comparing these values in a given lake can give insight into the broader mechanisms at play.
 
 * *chlorophyll a concentration*, a proxy for algal (phytoplankton) biomass. Pros: direct measure of primary productivity
-* *Secchi disk transparency*, a measure of water clarity. Pros: simple and cheap. Cons: may yield a high TSI in highly colored lakes and in lakes where particulate matter is comprised of non-algal material 
+* *Secchi disk transparency*, a measure of water clarity. Pros: simple and cheap. Cons: may yield a high TSI in highly colored lakes and in lakes where particulate matter is comprised of non-algal material. lower the disk down until you can no longer tell the difference btw the black and white part of the disk then take the measurement. reported in meters.
 * *Total phosphorus (TP)*, a nutrient essential for growth of primary producers. Assumptions: phosphorus is the limiting nutrient for phytoplankton growth (this assumption often holds only for summer months)
 
+#these are the equations from the original paper
 $TSI(Chl) = 10(6 - (2.04 - 0.68 ln Chl/ln 2))$
 
 $TSI(SD) = 10(6 - (ln SD/ln 2))$
@@ -97,22 +108,30 @@ $TSI(SD) = 10(6 - (ln SD/ln 2))$
 $TSI(TP) = 10(6 - (ln(48/TP)/ln 2))$
 
 TSI values correspond to the following trophic states: 
-**0-40**: Oligotrophic
-**40-50**: Mesotrophic
-**50-70**: Eutrophic
-**70-100**: Hypereutrophic
+**0-40**: Oligotrophic: oligo means few
+**40-50**: Mesotrophic: meso means middle
+**50-70**: Eutrophic: eu = high
+**70-100**: Hypereutrophic: hyper = hyper high
+#original intent was to describe waters and not use for management but is now used for management
 
 ### Exploring the LAGOS nutrient data frame
 ```{r}
 dim(LAGOSnutrient)
+
+#nice thing about dataset the dates are already dates! good to check though
 class(LAGOSnutrient$sampledate)
 
 LAGOStrophic <- LAGOSnutrient %>%
+  #the ., here is b/c left_join needs two df but since we're in a pipe then the ., shows we are using the df specified further up in the pipe
+  #you can also just specify a specific column to be joined by doing for example LAGOSlocations$sampledate
   left_join(., LAGOSlocations, by = "lagoslakeid") %>%
+  #just keep the columns we want b/c big df
   select(lagoslakeid, sampledate, chla, tp, secchi, 
          gnis_name, lake_area_ha, state, state_name) %>%
+  #use package lubridate to make year and month columns from sampledate column. remember year and month are functions in lubridate
   mutate(sampleyear = year(sampledate), 
          samplemonth = month(sampledate)) %>%
+  #drops any row with NA value in the specified column
   drop_na(chla, tp, secchi, state)
 
 ```
@@ -121,6 +140,7 @@ Let's look at observations of chl, secchi depth, and TP seasonally and over the 
 
 Add a line of code to facet the graphs by state.
 ```{r}
+#geom_jitter allows us to see what is behind the boxplots i.e. the datapoint clouds. Sore spot in limonology is that so many lakes have more observations in summer than winter
 ggplot(LAGOStrophic, aes(x = as.factor(samplemonth), y = chla)) +
   geom_jitter(alpha = 0.2, size = 0.5) +
   geom_boxplot(outlier.shape = NA, color = "#1f968b", fill = NA) +
@@ -149,6 +169,9 @@ What do you notice about the seasonality of these variables? If we were to chara
 Let's add a TSI value calculated from each of the three variables to the data frame. Let's also add a column that designates the lake as oligotrophic, mesotrophic, eutrophic, or hypereutrophic based on the TSI.chl value. 
 
 ```{r}
+#filter for growing season
+#mutate based on equations above
+#case_when is similar to an ifelse function. creates new column named trophic.class and then you put in what to fill the column with if the calculation above meets the criteria written
 LAGOStrophic <- LAGOStrophic %>%
   filter(samplemonth %in% c(5:9)) %>%
   mutate(TSI.chl = round(10*(6 - (2.04 - 0.68*log(chla)/log(2)))),
@@ -161,13 +184,18 @@ LAGOStrophic <- LAGOStrophic %>%
 
 class(LAGOStrophic$trophic.class)
 
+
 LAGOStrophic$trophic.class <- factor(LAGOStrophic$trophic.class,
                                      levels = c("Oligotrophic", "Mesotrophic", "Eutrophic", "Hypereutrophic"))
 
+class(LAGOStrophic$trophic.class)
+
 #scales::show_col(colormap(colormap = colormaps$magma, nshades=16))
+#look at hex codes for the color pallete 
 
 # Let's save the LAGOStrophic dataset as a csv in our Data folder. 
-
+#remember can use the read.csv
+#row.names = FALSE stops r from making the first column in the new csv just a column of 1-#ofrows in your dataset
 write.csv(LAGOStrophic, file = "./Data/Processed/LAGOStrophic.csv", row.names = FALSE)
 ```
 
@@ -216,6 +244,22 @@ ggplot(LAGOStrophic, aes(x = state, fill = trophic.class)) +
   labs(x = "", y = "Number of Observations", fill = "Trophic Class") +
   scale_fill_viridis_d(option = "magma", begin = 0.2, end = 0.8, direction = -1)
 
+```
+
+```{r}
+#This is if you don't have the lake names in a column aka if you don't have the what you want the legend to represent in a column by itself or with the name you want
+ggplot(dataset, aes(x = date)) +
+  geom_line(aes(y = Discharge, color = "total disharge")) +
+  geom_line(aes(y = Streamflow, color = "zone"))
+  scale_color_manual(values = c("total disharge" = "gray", "zone" = "red"))
+  
+#this is if you have what you want colored differently in one column like Peter and Paul lake
+ggplot(dataset, aes(x = date)) +
+  geom_line(aes(y = Discharge, color = lake)) +
+  scale_color_manual(values = c("gray", "red"))
+
+#in aes define hat data to use for legend via the color
+#define the color in the next line
 ```
 
 ## Closing Discussion
