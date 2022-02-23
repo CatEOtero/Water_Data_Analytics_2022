@@ -38,7 +38,7 @@ lagosne_get(dest_folder = LAGOSNE:::lagos_path(), overwrite = TRUE)
 ```
 
 ## Getting to know the LAGOSNE database
-Navigate to https://lagoslakes.org/. We will explore this website to learn about the LAGOS-NE dataset, research, and data management and use initiatives undergone by the resaerch team. 
+Navigate to https://lagoslakes.org/. We will explore this website to learn about the LAGOS-NE dataset, research, and data management and use initiatives undergone by the research team. 
 
 LagosNE is the start of nationwide effort. Rolling out over next few months. Their github page has a vignette on downloading etc and another on the organization of the dataset
 
