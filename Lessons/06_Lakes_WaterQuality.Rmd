@@ -33,7 +33,7 @@ theme_set(theme_classic())
 options(scipen = 4)
 
 #a linked database, lots of data within the database, takes a long time like 5mins to download
-lagosne_get(dest_folder = LAGOSNE:::lagos_path(), overwrite = TRUE)
+#lagosne_get(dest_folder = LAGOSNE:::lagos_path(), overwrite = TRUE)
 
 ```
 
@@ -211,6 +211,8 @@ ggplot(LAGOStrophic, aes(x = TSI.chl, y = TSI.secchi, color = samplemonth)) +
   scale_color_viridis_c(option = "magma", end = 0.8, direction = -1) +
   theme(legend.position = "top")
 
+#this distribution happens when the chlorophyll turbidty is really high. If secchi depth higher then there's probabaly more sediment/non-organic material decreases the transparency but its not the organic material.
+
 ggplot(LAGOStrophic, aes(x = TSI.chl, y = TSI.tp, color = samplemonth)) +
   geom_point(alpha = 0.1) + 
   scale_y_continuous(limits = c(0, 100)) +
@@ -218,6 +220,9 @@ ggplot(LAGOStrophic, aes(x = TSI.chl, y = TSI.tp, color = samplemonth)) +
   geom_abline(slope = 1, intercept = 0) +
   scale_color_viridis_c(option = "magma", end = 0.8, direction = -1) +
   theme(legend.position = "top")
+
+#trophic state index: is higher from chlorophyll than from phosphorus - what produces this situation: increase in phosphorous tightly correlated with increase in chlorphyll aka primary production
+#when High on TSI.tp then something other than phosphorus is limiting
 
 ```
 
@@ -237,13 +242,18 @@ ggplot(LAGOStrophic, aes(x = state, y = TSI.chl)) +
   geom_hline(yintercept = 40, lty = 2, color = "gray") +
   geom_hline(yintercept = 50, lty = 2, color = "gray") +
   geom_hline(yintercept = 70, lty = 2, color = "gray")
+#can do geom_rect() to get color to fill in between the dotted lines with color but this takes a lot of time because R fills in each point.
+#40 is olo and mesotrophic, meso and eu and eu and hyper, that's wat the dotted lines mean
+#chubby violion plot, not spread along range, means that distribution around the central tendency is low. skinnier spread along range means that more distribution
 
+#dodge puts all the bars next to each other. if you exclude this then the bars stack. preserve = "single" means that the bars will stay the same width even if, for example OH doesn't have meso and oligo. remember can also reorder the trophic classes to make them in the correct order not in lphabetical. i think that it's good as is but good to remember tou can do this for other times. 
 ggplot(LAGOStrophic, aes(x = state, fill = trophic.class)) +
   geom_bar(stat = "count", position = position_dodge(preserve = "single")) +
   theme(legend.position = "top") +
   labs(x = "", y = "Number of Observations", fill = "Trophic Class") +
   scale_fill_viridis_d(option = "magma", begin = 0.2, end = 0.8, direction = -1)
 
+#I like the magma color scheme-purple!
 ```
 
 ```{r}
