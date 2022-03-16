@@ -69,7 +69,7 @@ LAGOSlimno$lagoslakeid <- as.factor(LAGOSlimno$lagoslakeid)
 EPA also recently released a suite of stressor-response models built from the National Lakes Assessment that allow a user to build site-specific analyses in an interactive web app. More info here: https://www.epa.gov/nutrient-policy-data/ambient-water-quality-criteria-address-nutrient-pollution-lakes-and-reservoirs. See the [chlorophyll vs. TN and TP web app here](https://nsteps.epa.gov/apps/tp-tn-chl/).
 
 ```{r}
-# Join data frames to add state name onto the geo dataset
+# Join data frames to add state name onto the geo dataset b/c don't know what the state id in LAGOSgeo of the top of head
 LAGOSgeo <- left_join(LAGOSgeo, LAGOSstate)
 
 LAGOSjoined <- LAGOSnutrient %>%
@@ -116,6 +116,22 @@ Exercise:
 8. Create a linear model to evaluate the chlorophyll-TP relationship, with HUC 4 code as an interaction effect. Is it important to account for the HUC 4 code in the model? How might this classification impact potential nutrient management?
 
 ```{r}
+rm(LAGOSdata)
+
+LAGOSMN <- LAGOSjoined %>% 
+  left_join(., LAGOSdata$hu4) %>%
+  select(lagoslakeid, sampledate, state_name, hu4, chla, tn, tp) %>% 
+  mutate(sampleyear = year(sampledate), 
+         samplemonth = month(sampledate)) %>% 
+  filter(state_name == "Minnesota") %>% 
+  filter(Month == 6:9) %>% 
+  filter(Year >- 1990) %>% 
+  filter(hu4 == "0401", "0701", "0702", "0703", "0704", "0902")
+
+#8 log10 often used in stressor relationships to get a linear relationship
+LAGOSMN_plot <- ggplot(LAGOSMN, aes()) +
+
+#to include hu4 as an interaction term (aka interaction effect) we use the multiplication symbol. the plus symbol would have just given us one slope for all and an intercept for each different one.
 
 
 ```
@@ -125,6 +141,7 @@ Exercise:
 If we wanted to explore some of the other variables that might help predict lake water quality, the function `corrplot` will allow us to create a correlation matrix whereby we can assess the correlations among various variables. We could then use this exploration to inform classification and/or covariate analysis with stressor-response modeling. 
 
 ```{r}
+# putting possible covariates that may affect the water quality together
 LAGOScovariates <- LAGOSjoined %>%
   mutate(percentdeveloped = buffer500m_nlcd2011_pct_22 + buffer500m_nlcd2011_pct_23 + buffer500m_nlcd2011_pct_24,
          percentforest = buffer500m_nlcd2011_pct_41 + buffer500m_nlcd2011_ha_42 + buffer500m_nlcd2011_ha_43,
@@ -133,14 +150,18 @@ LAGOScovariates <- LAGOSjoined %>%
          maxdepth,lake_area_ha, buffer500m_slope_mean,
          percentdeveloped, percentforest, percentrowcrops)
 
-# create a correlation matrix. Necessitates only complete cases.
+# create a correlation matrix. Necessitates only complete cases. Needs to be its own data matrix. Use cor to creat the matrix so all variables are the columns and rows and their correlation btw each other is calculated. the dark blue diagonal down the middle is b/c when something correlated against itself is 1. Used to see how covariates are related aka correlated
 LAGOScorr <- cor(LAGOScovariates, use = "complete.obs")
 
+# Intro Corrplot
 # plot correlation matrix.
 corrplot(LAGOScorr)
 
-# customize.
+# customize so that only the upper half shows since the upper and lower (compared to the diagonal mirrors itself) with the type, diag = FALSE gets the self-correlation removed, endings change the text 
 corrplot(LAGOScorr, type = "upper", diag = FALSE, tl.cex = 0.8, tl.col = "black")
 
+#doc = dissolved organic carbon, more forest, higher slope correlated with more forest cover probs b/c harder to develop higher slope areas, bigger lakes correlated with deeper lakes. The size and color both change similarly for the correlation. 
+
+#Once have correlation plot can run an AIC to decide what to actually include in your model. Can also do a lasso or other. These are parametric. Machine learning method can also be used to choose a subset. 
 ```
 

@@ -1,6 +1,6 @@
 ---
 title: "Assignment 6: Water Quality in Lakes"
-author: "Student Name"
+author: "Catherine Otero"
 output: pdf_document
 geometry: margin=2.54cm
 editor_options: 
@@ -31,6 +31,13 @@ Target due date: 2022-03-01
 [Water Quality Portal Web Services Guide](https://www.waterqualitydata.us/webservices_documentation/)
 
 ```{r setup}
+getwd()
+
+library(tidyverse)
+library(lubridate)
+library(dataRetrieval)
+
+theme_set(theme_classic())
 
 NCdata <- readWQPdata(statecode = "North Carolina", 
                       siteType = "Lake, Reservoir, Impoundment", 

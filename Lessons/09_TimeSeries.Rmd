@@ -21,6 +21,7 @@ library(tidyverse)
 library(lubridate)
 library(dataRetrieval)
 
+
 theme_set(theme_classic())
 ```
 
@@ -33,7 +34,7 @@ Time series are a special class of dataset, where a response variable is tracked
 Analysis of time series presents several opportunities. In aquatic sciences, some of the most common questions we can answer with time series modeling are:
 
 * Has there been an increasing or decreasing **trend** in the response variable over time?
-* Can we **forecast** conditions in the future?
+* Can we **forecast** conditions in the future or backcast into the past?
 
 ### Challenges
 
@@ -68,17 +69,18 @@ names(NeuseFlow)[4:5] <- c("Discharge", "Approval.Code")
 ggplot(NeuseFlow, aes(x = Date, y = Discharge)) +
   geom_line() +
   labs(x = "", y = "Discharge (cfs)")
+  #scale_y_log10()
 
 
 ```
 
-How would you characterize the time series of discharge and conductivity at this location? Do you see a linear trend over time? What factors might you need to take into account to be able to detect a trend or forecast future conditions?
+How would you characterize the time series of discharge at this location? Do you see a linear trend over time? What factors might you need to take into account to be able to detect a trend or forecast future conditions?
 
->
+> Seaonality needs to be accounted for if we want to detect a trend overtime. Increase in the height of peaks. Is this systemic or one-offs? Logging the data can help visualize a potential trned. Useful to know if there are one-off events like company effuluent dump or something that is indepednent event causing the peak and not necessarily fit into the trend causing.
 
 Are there situations where it would be appropriate to use a linear regression to model a time series? If so, what is an example?
 
->
+>If remove seasonality or things less quickly changing as disharge does, so maybe for things like soil quality etc. COuld add a gm_line just for exploratory purposes. If aggregate to a yearly or monthly would you see something else? sometimes aggregating up removes swings in daily discharge or other variables that change quickly.
 
 
 ## Decomposing a time series dataset
@@ -92,7 +94,7 @@ A given time series can be made up of several component series:
 
 We first need to turn the discharge data into a time series object in R. This is done using the `ts` function. Notice we can only specify one column of data and need to specify the period at which the data are sampled. The resulting time series object cannot be viewed like a regular data frame.
 
-Note: time series objects must be equispaced, which requires interpolation if the data have not been collected at regular intervals. In our case, we have daily data with no NAs in the data frame, so we don't need to worry about this.
+Note: time series objects must be equispaced, which requires interpolation if the data have not been collected at regular intervals. In our case, we have daily data with no NAs in the data frame, so we don't need to worry about this. AKA if it wasn't recorded everyday and was more random then we would have to interpolate by creating a daily column filled with NAs and then interprolating to fill in the NAs. See EDA Time Series Assignment for how to do this. Or the conductivity section of this assignment further down
 ```{r}
 
 Neuse_ts <- ts(NeuseFlow[[4]], frequency = 365)
@@ -102,27 +104,29 @@ Neuse_ts <- ts(NeuseFlow[[4]], frequency = 365)
 The `stl` function decomposes the time series object into its component parts. We must specify that the window for seasonal extraction is either "periodic" or a specific number of at least 7. The decomposition proceeds through a loess (locally estimated scatterplot smoothing) function.
 
 ```{r}
-?stl
+?stl #Loess is a moving average type of approach to decomposition
 # Generate the decomposition
 Neuse_Decomposed <- stl(Neuse_ts, s.window = "periodic")
 
 # Visualize the decomposed series. 
 plot(Neuse_Decomposed)
+#First: all the data. Second: season and looks the same b/c accounts for what season looks for on a cyclic timeframe. looks Third: shows the trend with a moving avg approach so that's why it is going up and down. Fourth: anything not accounted for by the trend or the season.
+#The different bars on right hand side shows the difference in scale between the mini plots. The bigger the bar the smaller the scale aka smaller being -1000 to 1000 vs say -50000 to 50000.
 
-# We can extract the components and turn them into data frames
+# We can extract the components and turn them into data frames. The components are the data we just saw on the plot with a column for each four components. We do this so we can plot them with ggplot which has more functionality than plot()
 Neuse_Components <- as.data.frame(Neuse_Decomposed$time.series[,1:3])
 Neuse_Components <- mutate(Neuse_Components,
                       Observed = NeuseFlow$Discharge,     
                       Date = NeuseFlow$Date)
 
-# Visualize how the trend maps onto the data
+# Visualize how the trend maps onto the data. trend is positive b/c discharge has to be positive
 ggplot(Neuse_Components) +
   geom_line(aes(y = Observed, x = Date), color = "gray", size = 0.25) +
   geom_line(aes(y = trend, x = Date), color = "#c13d75ff") +
   geom_hline(yintercept = 0, lty = 2) +
   labs(x = "", y = "Discharge (cfs)")
 
-# Visualize how the seasonal cycle maps onto the data
+# Visualize how the seasonal cycle maps onto the data. Consider we can't actually have a negative discharge the seasonality just makes it appear negative but probably evens out with the peaks and troughs
 ggplot(Neuse_Components) +
   geom_line(aes(y = Observed, x = Date), color = "gray") +
   geom_line(aes(y = seasonal, x = Date), color = "#c13d75ff") +
@@ -140,6 +144,7 @@ Note that the decomposition can yield negative values when we apply a seasonal a
 We talked last time about the phenomenon of salinization in freshwaters and how this has increased over time in many places. Let's look into conductivity in the Neuse to analyze this phenomenon.
 
 ```{r}
+#This one still not working for me. I get the fatal error, yay.
 NeuseCond <- readWQPqw(siteNumbers = "USGS-02089500", # Neuse River at Kinston, NC
                      parameterCd = "90095",  # Specific conductance, uS/cm
                      startDate = "1976-01-01",
@@ -147,6 +152,8 @@ NeuseCond <- readWQPqw(siteNumbers = "USGS-02089500", # Neuse River at Kinston, 
 # Plot conductivity over time
 ggplot(NeuseCond, aes(x = ActivityStartDate, y = ResultMeasureValue)) +
   geom_point()
+
+#Big gap btw 2001 and 2007. collected monthly but not on same day everyday. fewer observations
 ```
 
 It is important to visualize your time series before moving forward with any test. In this case, we notice a few things: 
@@ -160,27 +167,30 @@ We see that conductivity data were collected approximately monthly across the sa
 
 Common interpolation methods: 
 
-* **Piecewise constant**: <fill in notes here>
-* **Linear**: <fill in notes here>
-* **Spline**: <fill in notes here>
+* **Piecewise constant**: nearest neighbor interprolation, takes the value of the nearest neighbor
+* **Linear**: connect the dots across the gap, very common in water science
+* **Spline**: uses quadratic formulas, don't add a whole lot more than linear inter just more complicated
 
 Linear interpolation is most common for water quality data, and fits with our understanding about how conductivity might change over time in this system. 
 
 ```{r}
 # create a data frame of months
+#could do on different timeframes down to hour and up to year and maybe others
 Months <- data.frame(Date_monthrounded = seq.Date(from = as.Date("1980-10-01"), to = as.Date("2021-12-01"), by = "month"))
 
 NeuseCond_processed <- NeuseCond %>%
-  select(Date = ActivityStartDate,
+  select(Date = ActivityStartDate, #select columns and rename them at same time, useful
          Conductivity = ResultMeasureValue) %>%
   mutate(Year = year(Date),
          Month = month(Date),
-         Date_monthrounded = floor_date(Date, "month")) %>%
+         Date_monthrounded = floor_date(Date, "month")) %>% 
   arrange(Date)
+#floor_date rounds the date down and we tell it when to round it down to i.e. tell each monthly sampling date to be represented by the 1st of the month since that is the floor of the month. Make sure the data is actually collected monthly in order to use this approach as every 3wks would look different
+
 
 NeuseCond_monthly <- left_join(Months, NeuseCond_processed)
 
-# Generate monthly values from October 1980 to December 2021
+# Generate monthly values from October 1980 to December 2021, this is the line of code actually doing the linear interprolation. Annoying thing is it creates a new df with an x and y, so have to tell R to fill in conductivity with the y column from the interprolation- this is also a useful thing to know how to do!
 linearinterpolation <- as.data.frame(approx(NeuseCond_monthly$Conductivity, n = 566, method = "linear"))
 NeuseCond_monthly$Conductivity <- linearinterpolation$y
 
@@ -191,7 +201,34 @@ NeuseCond_monthly$Conductivity <- linearinterpolation$y
 2. Decompose and plot the time series.
 3. Analyze the decomposed time series. Is there distinct seasonality? How does the magnitude of seasonality compare to the trend and random components of the time series? What are some caveats that need to be considered for the gap between October 2001 through February 2007?
 
+Seasonality is a 10% change overtime so is enough of a change to consider within the analysis. This is an example of why it is important to compare the magnitude of the seasonality and the data overall. the decomp will always produce some seasonality but if look at magnitude and it is really small then it may not be really seasonal.
+One way to deal with the gap could be to take the season and splice onto the gap or could do this with the trend line. Use the decomp to inform the interpolation and splicing. Data quite variable. 
+
 ```{r}
+#create time series, remember to tell R which column to run the time series for wither like this or like NeuseCond_monthly$columnname. IDK if this is the correct column number b/c I can't load this data on my laptop
+conductivity_ts <- ts(NeuseCond_monthly[[4]], frequency = 12)
+
+#decompose
+conductivity_decomposed <- stl(NeuseCond_monthly, s.window = "periodic")
+
+# Visualize the decomposed series. 
+plot(NeuseCond_monthly)
+
+# take components and put in df
+Neuse_Cond_Components <- as.data.frame(conductivity_decomposed$time.series[,1:3])
+
+#change for the correct column names once I can see the data
+Neuse_Cond_Components <- mutate(conductivity_components,
+                      Observed = NeuseFlow$Discharge,     
+                      Date = NeuseFlow$Date)
+
+# Visualize how the trend maps onto the data. trend is positive b/c discharge has to be positive
+ggplot(Neuse_Cond_Components) +
+  geom_line(aes(y = Observed, x = Date), color = "gray", size = 0.25) +
+  geom_line(aes(y = trend, x = Date), color = "#c13d75ff") +
+  geom_hline(yintercept = 0, lty = 2) +
+  labs(x = "", y = "Conductivity")
+
 
 ```
 

@@ -63,7 +63,8 @@ Parameters of interest:
 ```{r}
 NeuseParams <- whatNWISdata(siteNumbers = "02089500")
 
-NeuseWQ <- readWQPqw(siteNumbers = "USGS-02089500", # Neuse River at Kinston, NC
+#may have to change around how you write out the site numbers depending on what function you're using to call the data. Notice here you use a dash
+NeuseWQ <- readWQPqw(siteNumbers = "USGS-02089500", # Neuse River at Kinston,NC
                      parameterCd = c("00915", # calcium, filtered mg/L
                                      "00925", # magnesium, filtered mg/L
                                      "00930", # sodium,filtered mg/L
@@ -80,6 +81,7 @@ NeuseFlow <- readNWISdv(siteNumbers = "02089500",
                      startDate = "1976-01-01",
                      endDate = "")
 
+#important to rename the variable so you can keep all the info. Bad idea to use column names that have spaces so rename so have no spaces. We are removing old column and replacing with new
 NeuseWQ_processed <- NeuseWQ %>%
   select(MonitoringLocationIdentifier, ActivityStartDate, HydrologicCondition, 
          CharacteristicName, ResultMeasureValue) %>%
@@ -89,20 +91,23 @@ NeuseWQ_processed <- NeuseWQ %>%
                               CharacteristicName == "Calcium" ~ "Calcium_mg.L",
                               CharacteristicName == "Magnesium" ~ "Magnesium_mg.L",
                               CharacteristicName == "Sodium" ~ "Sodium_mg.L")) %>%
-  select(-CharacteristicName) %>%
-  pivot_wider(names_from = "Variable", values_from = "ResultMeasureValue")
+  select(-CharacteristicName) %>% #this line is deselecting. 
+  pivot_wider(names_from = "Variable", values_from = "ResultMeasureValue") # R preserves the data that not mentioned in our pivot wider
 
+#Can also rename columns by using the select function. Filter by min and max if gonna join datasets with full join to keep within our timeframe
 NeuseFlow_processed <- NeuseFlow %>%
   select(ActivityStartDate = Date, Flow_cfs = X_00060_00003) %>%
   filter(ActivityStartDate >= min(NeuseWQ_processed$ActivityStartDate) & 
            ActivityStartDate <= max(NeuseWQ_processed$ActivityStartDate))
 
+#full join so we can keep all the data
 NeuseWQFlow_processed <- NeuseWQ_processed %>%
   full_join(., NeuseFlow_processed) %>%
   mutate(Year = year(ActivityStartDate), 
          Month = month(ActivityStartDate), 
          DOY = yday(ActivityStartDate),)
 
+#create a long dataset so we can use the data for some specific visulizations later
 NeuseWQFlow_long <- NeuseWQFlow_processed %>%
   pivot_longer(cols = c("FecalColiform_cfu.100mL", "FecalStrep_cfu.100mL", "SpC_uS.cm",
                         "Sodium_mg.L", "Magnesium_mg.L", "Calcium_mg.L", "Flow_cfs"),
@@ -121,6 +126,7 @@ NeuseFlow_summary <- NeuseWQFlow_processed %>%
 Period of record time series
 
 ```{r}
+#can put NAs in for the data gaps to get rid of the line that connects the data on either side of the gap
 ggplot(NeuseWQFlow_long, aes(x = ActivityStartDate, y = Value)) +
   geom_line() +
   facet_wrap(vars(Variable), nrow = 7, scales = "free_y") +
@@ -144,10 +150,12 @@ What is the relationship between flow and the water quality indicators?
 
 ```{r}
 
+#see wet and dry seasons in NC
 ggplot(NeuseFlow_summary, aes(x = DOY)) +
   geom_line(aes(y = median_Flow_cfs)) +
-  geom_ribbon(aes(ymin = p25_Flow_cfs, ymax = p75_Flow_cfs), fill = "gray", alpha = 0.2) +
+  geom_ribbon(aes(ymin = p25_Flow_cfs, ymax = p75_Flow_cfs), fill = "black", alpha = 0.2) +
   #geom_point(data = NeuseWQFlow_processed, aes(y = FecalColiform_cfu.100mL)) +
+  #comment these lines in to overlay data on top, looks like e.coli happens in dry season. Probs should have different axis if doing for a publication but good first look
   #geom_point(data = NeuseWQFlow_processed, aes(y = SpC_uS.cm)) +
   scale_y_log10() +
   labs(x = "Day of Year", y = "Flow (cfs)")
@@ -168,6 +176,8 @@ ggplot(NeuseWQFlow_processed, aes(x = Flow_cfs, y = SpC_uS.cm)) +
   scale_y_log10() +
   labs(x = "Flow (cfs)", y = expression("Specific Conductivity ("*mu*"S/cm)"))
 
+#can just do the regression and summary in one line and don't have to name the regression and then do summary
+#naming the regression can be good if using the regression in other stuff after but otherwise might as well not
 summary(lm(data = NeuseWQFlow_processed, log10(SpC_uS.cm) ~ log10(Flow_cfs)))
 
 ```
