@@ -11,7 +11,7 @@ editor_options:
 ## Lesson Objectives
 1. Choose appropriate time series analyses for trend detection and forecasting
 2. Discuss the influence of seasonality on time series analysis
-3. Perform foecasting with ARMA modeling
+3. Perform forecasting with ARMA modeling
 4. Interpret and communicate results of time series analyses 
 
 ## Session Set Up
@@ -55,15 +55,15 @@ In general, detecting a monotonic trend requires a long sequence of data with fe
 
 Adjusting the data may be necessary to fulfill the assumptions of a trend test. These adjustments include **aggregation**, **subsampling**, and **interpolation**. What do each of these mean, and why might we want to use them?
 
-> aggregation: 
+> aggregation: smooth over data gaps by aggregating i.e. if don't have daily data for every month but have same for each month then could use a central tendencey like mean to aggregate up and then do the analysis on. Good reason to do: some time series requires no temporal autocorrelation. monthly data may be less autocorrelated than daily data. This is why time-series isn't used that often with daily data. lake smapling best practice is every two weeks or monthly to go out into field and check. 
 
-> subsampling: 
+> subsampling: a lot of approachs require you to train your model on some of your data and then run the model on the rest of it as the analysis. another example is if have daily data then you could sample on first of every week
 
-> interpolation: 
+> interpolation: use surrounding data to fill in the gaps, time-series don't let you run with NAs
 
 Specific tests for monotonic trend analysis are listed below, with assumptions and tips: 
 
-* **linear regression**: no seasonality, fits the assumptions of a parametric test. Function: `lm`
+* **linear regression**: no seasonality, fits the assumptions of a parametric (conform to a normal distribution) test. Function: `lm`
 * **Mann-Kendall**: no seasonality, non-parametric, no temporal autocorrelation, missing data allowed. Function: `mk.test` (package: trend)
 * **modified Mann-Kendall**: no seasonality, non-parametric, accounts for temporal autocorrelation, missing data allowed. Function: `mmky` and `mmkh` (package: modifiedmk)
 * **Seasonal Mann-Kendall**: seasonality, non-parametric, no temporal autocorelation, identical distribution. Function: `smk.test` (package: trend)
@@ -74,7 +74,7 @@ If covariates (another predictor variable) are included in the dataset, addition
 
 ### Trend test example: Discharge and Conductivity in the Neuse River
 
-Last week, we examined time series of discharge and conductivity in the Neuse River. We decomposed these time series and found that both had distinct seasonality. Therefore, we will proceed with a **Seasonal Mann-Kendall** test. Recall that for the conductivity data, we also performed a linear interpolation to fill in missing months. 
+Last week, we examined time series of discharge and conductivity in the Neuse River. We decomposed these time series and found that both had distinct seasonality. Therefore, we will proceed with a **Seasonal Mann-Kendall** test. Recall that for the conductivity data, we also performed a linear interpolation to fill in missing months. Trim data so have distinct start and end for the Mann-Kendall.
 
 ```{r}
 
@@ -114,7 +114,7 @@ NeuseCond_monthly <- left_join(Months, NeuseCond_processed)
 linearinterpolation <- as.data.frame(approx(NeuseCond_monthly$Conductivity, n = 566, method = "linear"))
 NeuseCond_monthly$Conductivity <- linearinterpolation$y
 
-# generate total monthly discharge
+# generate total monthly discharge, multiplying by end thing to get data to be acre ft per month
 NeuseFlow_monthly <- NeuseFlow %>%
   mutate(Year = year(Date),
          Month = month(Date)) %>%
@@ -127,15 +127,18 @@ NeuseFlow_monthly <- NeuseFlow %>%
 Let's visualize the seasonality of these two datasets. Add some editing to improve the graphs.
 
 ```{r}
+#someone added a jitter on top so you can see the data on top 
 Condplot <-
 ggplot(NeuseCond_monthly, aes(x = as.factor(Month), y = Conductivity)) +
-  geom_boxplot()
+  geom_boxplot() +
+  labs(x = Month, y = expression("Conductivity ("*mu*"S/cm)")) #micrometers per centimeters
 
 Flowplot <-
 ggplot(NeuseFlow_monthly, aes(x = as.factor(Month), y = Discharge_acftmo)) +
-  geom_boxplot()
+  geom_boxplot() +
+  labs(x = Month, y = Discharge (acre-ft))
 
-plot_grid(Condplot, Flowplot, ncol = 1)
+plot_grid(Condplot, Flowplot, ncol = 1, align = "hv") #aligns horizontally and vertically, can filter out the months b/c top graph has NAs so has 13 ticks instead of 12 for months, could do ggplot(subset(NeuseCond_monthly, !is.na(Month)), aes....rest is the same as above)
 ```
 
 
@@ -152,11 +155,12 @@ NeuseCond_trend <- smk.test(NeuseCond_timeseries)
 NeuseCond_trend
 summary(NeuseCond_trend)
 
+# positive z score is that it is a positive trend overtime, S tracks the trends overtime, bigger z score (whether positive or negative) then p-value is smaller. The summary gives you a monthly report of s, p and z scores. remember what month/whenever you decided to start because may come up with different name i.e. may say season one and have to know that's October in this case
 ```
 
 What would we conclude based on these findings? 
 
->
+>More sig effect in the winter months
  
 If a significant trend was present, we could compute a **Sen's Slope** to quantify that trend (`sens.slope` function in the trend package).
 
@@ -171,7 +175,7 @@ NeuseFlow_timeseries <- ts(NeuseFlow_monthly$Discharge_acftmo, frequency = 12,
 
 What would we conclude based on these findings? 
 
->
+>Listen to 7:55 section.
  
 ## Autoregressive and Moving Average Models (ARMA)
 
@@ -204,22 +208,23 @@ While some processes might be easy to identify, it is often complicated to predi
 
 ```{r}
 
-# run the arima function and search for best fit 
+# run the arima function and search for best fit, arima checks the errors and tells you which one is the best option, we can use this to define out autocorrelation and forecasting
 auto.arima(NeuseFlow_timeseries, trace = TRUE)
 
-# create an object that defines the best fit model
+# create an object that defines the best fit model 
 fit <- arima(NeuseFlow_timeseries, c(1,0,0),seasonal = list(order = c(0,0,2), period = 12))
 
-# make a prediction into the future
+# make a prediction into the future, 10 years of 12 months each
 Neuseprediction <- predict(fit, n.ahead = 10*12)
 
 # plot future predictions
 ts.plot(NeuseFlow_timeseries, Neuseprediction$pred, lty = c(1, 3))
 
+#the prediction is bad haha so much random component that the forecast is bad. This is not the correct model (the autoregressive, moving average model) for this data
 ```
 
 How do future predictions compare to the past? Why might the forecast be lacking in complexity?
 
-> 
+> Less complex b/c don't have the data to feed into it directly. only data on one side of the "gap" If think of it like interpolating you only have the past points to interprolate with so less complex. 
 
 
