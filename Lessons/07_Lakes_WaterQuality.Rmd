@@ -150,7 +150,7 @@ LAGOScovariates <- LAGOSjoined %>%
          maxdepth,lake_area_ha, buffer500m_slope_mean,
          percentdeveloped, percentforest, percentrowcrops)
 
-# create a correlation matrix. Necessitates only complete cases. Needs to be its own data matrix. Use cor to creat the matrix so all variables are the columns and rows and their correlation btw each other is calculated. the dark blue diagonal down the middle is b/c when something correlated against itself is 1. Used to see how covariates are related aka correlated
+# create a correlation matrix. Necessitates only complete cases. Needs to be its own data matrix. Use cor to create the matrix so all variables are the columns and rows and their correlation btw each other is calculated. the dark blue diagonal down the middle is b/c when something correlated against itself is 1. Used to see how covariates are related aka correlated
 LAGOScorr <- cor(LAGOScovariates, use = "complete.obs")
 
 # Intro Corrplot
@@ -163,5 +163,10 @@ corrplot(LAGOScorr, type = "upper", diag = FALSE, tl.cex = 0.8, tl.col = "black"
 #doc = dissolved organic carbon, more forest, higher slope correlated with more forest cover probs b/c harder to develop higher slope areas, bigger lakes correlated with deeper lakes. The size and color both change similarly for the correlation. 
 
 #Once have correlation plot can run an AIC to decide what to actually include in your model. Can also do a lasso or other. These are parametric. Machine learning method can also be used to choose a subset. 
+```
+
+```{r}
+library(corrplot)
+
 ```
 

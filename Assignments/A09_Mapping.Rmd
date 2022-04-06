@@ -50,8 +50,16 @@ Target due date: 2022-04-12
 
 
 ```{r}
+EnoParams <- whatNWISdata(siteNumbers = "02089500")
 
+EnoCoords <- EnoParams %>%
+  select(site_no, dec_lat_va, dec_long_va) %>%
+  distinct()
 
+start_point <- st_sfc(st_point(c(EnoCoords$dec_long_va, EnoCoords$dec_lat_va)), 
+                      crs = 4269) # NAD83, commonly  used by US agencies
+start_comid <- discover_nhdplus_id(start_point)
+#I think the problem is the crs
 ```
 
 4. What is the upstream drainage area for this gage, and how are the flowpaths distributed with regard to stream order?

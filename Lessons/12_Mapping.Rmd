@@ -10,6 +10,8 @@ editor_options:
 
 ## Lesson Objectives
 
+NOTE for EDA: the flowline df we were supposed to get out of this has a flowlength in km 
+
 1. Delineate watersheds and flowlines using nhdplusTools
 2. Extract spatial information from delineated watersheds
 3. Create maps of river networks
@@ -38,21 +40,23 @@ Key terms from the [nhdplusTools guide](https://usgs-r.github.io/nhdplusTools/):
 
 "**Flowpath:** The HY_Features name for a hydrologic feature that is the primary path water follows through a catchment; either from headwater to outlet or inlet to outlet. Flowpath is used when describing aspects of the abstract flowpath featuretype, generally in relation to a flowpath’s relationship to a catchment."
 
-"**Catchment:** The most abstract unit of hydrology in HY_Features is the catchment. It is a physiographic unit with zero or one inlets and one outlet. It does not inherently have any conceptual realizations. Rather, a given catchment can be realized in a number of ways; flowpath, divide, and networks of flowpaths and divides are the primary realizations."
+"**Catchment:** The most abstract unit of hydrology in HY_Features is the catchment. It is a physiographic unit with zero or one inlets and one outlet. It does not inherently have any conceptual realizations. Rather, a given catchment can be realized in a number of ways; flowpath, divide, and networks of flowpaths and divides are the primary realizations." A polygon with 0 or 1 inlets and one outlet.
 
 "**Catchment divide:** NHD “catchment” polygons are more accurately described as “catchment divide” features. Because of the overlap with the HY_Features abstract “catchment” feature type, “catchment divide” is used for polygon representations of catchments."
 
 We will be going through a basic example today, but there are numerous extensions that can be explored. A good start guide can be found [here](https://usgs-r.github.io/nhdplusTools/articles/nhdplushr.html)
+
+Lots of warnings that are thrown using nhdplus but as long as getting the functionality just keep chugging
 
 ### Watershed and flowpath delineation 
 
 Let's delineate the upstream watershed for the sampling and gage site: Neuse River at Kinston, NC.  
 
 ```{r}
-# Recall there are a lot of parameters measured at the site
+# Recall there are a lot of parameters measured at the site. 1 failed to parse message is okay.
 NeuseParams <- whatNWISdata(siteNumbers = "02089500")
 
-# Extract latitude and longitude for the site
+# Extract latitude and longitude for the site, need to do this for dam EDA sites, may need to download more data or change geometry into lat and long if you can back do this.
 NeuseCoords <- NeuseParams %>%
   select(site_no, dec_lat_va, dec_long_va) %>%
   distinct()
@@ -61,23 +65,27 @@ NeuseCoords <- NeuseParams %>%
 start_point <- st_sfc(st_point(c(NeuseCoords$dec_long_va, NeuseCoords$dec_lat_va)), 
                       crs = 4269) # NAD83, commonly  used by US agencies
 start_comid <- discover_nhdplus_id(start_point)
+#start_comid will show up as a value not a df in the environment
+#below are other ways to run the starting point
 # start_point2 <- st_as_sf(data.frame(x = NeuseCoords$dec_long_va, y =  NeuseCoords$dec_lat_va), 
 #                             coords = c("x", "y"), crs = 4269)
 
-# Navigate the NLDI network
+# Navigate the NLDI network, has flowlines
 NLDI <- navigate_nldi(list(featureSource = "comid", featureID = start_comid), 
                           mode = "upstreamTributaries", 
                           distance_km = 1000)
 
-# Extract watershed and flowpath information
+# Extract watershed and flowpath information, set up a temp file to extract stuff, currently the info is a list and we can extract stuff from the list and turn it into a df
+
 subset_file <- tempfile(fileext = ".gpkg")
 subset <- subset_nhdplus(comids = as.integer(NLDI$UT$nhdplus_comid),
                          output_file = subset_file,
-                         nhdplus_data = "download", 
-                         flowline_only = FALSE,
+                         nhdplus_data = "download", #download the nhdplus data associated with the ID
+                         flowline_only = FALSE, #get more info than just the flowline from the download
                          return_data = TRUE, overwrite = TRUE)
+#This step will take awhile probs
 
-# Create data frames
+# Create data frames, how get points
 flowline <- subset$NHDFlowline_Network
 catchment <- subset$CatchmentSP
 waterbody <- subset$NHDWaterbody
@@ -86,13 +94,14 @@ class(flowline)
 class(catchment)
 class(waterbody)
 
-# find gages near watershed
+# find gages near watershed, find other gages in the area upstream of the current gage. Can also specify the distance of the search by putting in a length-look at help or the warning for help
 gages <- get_nwis(AOI = catchment)
 class(gages)
 
-# find gages only within watershed
+# find gages only within watershed, Kateri's most used tool in this package, find a subset of gages that are actually within the catchment and not just in the area found above, keep just the gages within the catchment
 gages <- st_intersection(gages, catchment)
 
+#there's an opposite of intersection it's difference. Look at the sf cheatsheet. https://www.rstudio.com/resources/cheatsheets/ go here and search simple features (sf)
 ```
 
 ### Mapping the network
@@ -107,18 +116,21 @@ Extensions:
 
 
 ```{r}
-
+#can specify the minimum stream order you want to show i.e. 3 here, if don't specify streamorder than it defaults to 1.
+#this code is not dependent on the previous code an independent visualization
 plot_nhdplus("USGS-02089500", streamorder = 3)
 
 states <- st_as_sf(map(database = "state", plot = FALSE, fill = TRUE, col = "white"))
 nc <- filter(states, ID == "north carolina")
 
+#tricky because above eno is tiny area
 ggplot(nc) +
   geom_sf(fill = "white") +
   geom_sf(data = flowline, aes(color = streamorde)) +
   labs(color = "Stream Order") +
   theme(legend.position = "top")
 
+#catchment area is bigger and more spatial data, lines, pts, and polygons
 ggplot(catchment) +
   geom_sf(fill = "white", color = "gray", lwd = 0.5) +
   geom_sf(data = flowline, aes(color = streamorde)) +
@@ -129,8 +141,8 @@ ggplot(catchment) +
 ```
 
 ### Analyzing tabular information from the network
-
-1. How are flowlines distributed with respect to stream order?
+If we want to know specific info about catchment then we can do stuff like below.
+1. How are flowlines distributed with respect to stream order? I.e. how many streamlines are what sream order. Neuse up to 6 and Eno up to 4. 
 2. How do flowline slopes compare across stream order?
 3. Total drainage area
 
@@ -142,7 +154,9 @@ ggplot(subset(flowline, slope >= 0),
        aes(x = as.factor(streamorde), y =slope)) +
   geom_boxplot() +
   scale_y_log10()
-  
+#higher order have lower slope because flatter, gain voulme as river gets larger and tend to slow down and tend to get flatter. also rivers tend to go from high steep ground to low flat ground. tend to see this across rivers and streams.
+
+#this is in total sq km of the specific catchment of the flowline and tracks the upstream and downstream nodes, so what is total area of upstream nodes (all those nodes above the outlet). This seems useful and simple  
 max(flowline$totdasqkm)
 
 ```
